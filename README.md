@@ -29,13 +29,9 @@ programming languages and operating systems for which there is no available Conn
 * It provides access control mechanisms to ensure that only authorized
 applications can access the DDS Global Data Space.
 
-To learn more about _RTI Web Integration Service_ check out its complete
-[documentation](https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/web_integration_service/index.html).
-It includes detailed instructions as well as simple tutorials that will help
-you get started.
-
-## Contributing Enhancements
-To contribute enhancements or additional examples to the repository, follow
-the instructions on our [RTI Connext DDS Examples Wiki](https://github.com/rticommunity/rticonnextdds-examples/wiki) and the [CONTRIBUTING.md](https://github.com/rticommunity/rtiwebintegrationservice-examples/blob/master/CONTRIBUTING.md) file, which includes our CLA and License.
-Your contributions will be reviewed and as soon as they are approved they will
-be merged into the master branch of this repository.
+In this repository you will find some examples illustrating the most important
+features of RTI Web Integration Service, including support for different
+languages such as Javascript and Python and different protocols such as HTTP
+and WebSockets. For more information, please refer to the [RTI Web Integration
+Service User's
+Manual](https://community.rti.com/static/documentation/connext-dds/current/doc/manuals/web_integration_service/index.html).

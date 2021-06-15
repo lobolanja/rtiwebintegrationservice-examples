@@ -20,6 +20,9 @@ rti.shapesdemo = {
      * needs to be called before reading or drawing shapes.
      */
     setupScenario: function() {
+        const rest_websocket_path = "/dds/v1/websocket_connections";
+        const websocket_name = "MyWebSocketConnection";
+
         rti.shapesdemo.canvas = new fabric.Canvas(
             'shapesDemoCanvas',
             {
@@ -29,72 +32,62 @@ rti.shapesdemo = {
                 backgroundImage: '../../../../resources/img/rti_background.png'
             }
         );
+
+        /**
+         * Send a Post message to create a webSocket connection with the name
+         * that you want to use.
+         * Example:
+         *      "name": "MyWebSocketConnection"
+         *      will open a WebSocket connection in the URI
+         *      ws://<hostname>:<port>/dds/websocket/MyWebSocketConnection
+         */
+
+        $.ajax({
+            type: "POST",
+            url: window.location.origin + rest_websocket_path,
+            data: JSON.stringify(
+                [{ "name": websocket_name }]
+            ),
+            contentType: "application/dds-web+json",
+            dataType: "json",
+            success: function (response) {
+                console.log("WebSocket Enable");
+                rti.shapesdemo.readShapes();
+            },
+            failure: function (response) {
+                console.log("No WebSocket enable");
+                console.log("Error: " + response.responseText);
+            }
+        });
     },
 
     /**
-     * Setus up the enviroment for reading shapes. The method will call the
-     * methods that drawing shapes 33 ms intervals.
+     * Sets up the enviroment for reading shapes. The method will call the
+     * methods that draw shapes at 33 ms intervals.
      */
     readShapes: function() {
-        var squareReaderUrl =
+        /**
+         * URLs that the example will be used
+         */
+        const squareReaderUrl =
             "/dds/rest1/applications/ShapesDemoApp" +
             "/domain_participants/MyParticipant" +
             "/subscribers/MySubscriber" +
             "/data_readers/MySquareReader";
-        var triangleReaderUrl =
+        const triangleReaderUrl =
             "/dds/rest1/applications/ShapesDemoApp" +
             "/domain_participants/MyParticipant" +
             "/subscribers/MySubscriber" +
             "/data_readers/MyTriangleReader";
-        var circleReaderUrl =
+        const circleReaderUrl =
             "/dds/rest1/applications/ShapesDemoApp" +
             "/domain_participants/MyParticipant" +
             "/subscribers/MySubscriber" +
             "/data_readers/MyCircleReader";
 
-        var shapesDemoIntervalPeriod = 33; // in milliseconds
-
-        // Call drawShape() for Squares, Circles, and Triangles every
-        // shapesDemoIntervalPeriod, and passing the data resulting
-        // for reading new samples of the appropriate topic in json format
-        // without deleting the samples from the Reader's cache.
-        setInterval(function(){
-            // Read Squares
-            $.getJSON(
-                squareReaderUrl,
-                {
-                    sampleFormat: "json",
-                    removeFromReaderCache: "false"
-                },
-                function(data) {
-                    rti.shapesdemo.drawShape(data, "Square");
-                }
-            );
-
-            // Read Triangles
-            $.getJSON(
-                triangleReaderUrl,
-                {
-                    sampleFormat: "json",
-                    removeFromReaderCache: "false"
-                },
-                function(data) {
-                    rti.shapesdemo.drawShape(data, "Triangle");
-                }
-            );
-
-            // Read Circles
-            $.getJSON(
-                circleReaderUrl,
-                {
-                    sampleFormat: "json",
-                    removeFromReaderCache: "false"
-                },
-                function(data) {
-                    rti.shapesdemo.drawShape(data, "Circle");
-                }
-            );
-        }, shapesDemoIntervalPeriod);
+        square_ws = this.createWebSocket(squareReaderUrl, "Square");
+        circle_ws = this.createWebSocket(circleReaderUrl, "Circle");
+        triangle_ws = this.createWebSocket(triangleReaderUrl, "Triangle");
     },
 
     /**
@@ -105,7 +98,8 @@ rti.shapesdemo = {
      * 'Square', or 'Triangle'.
      */
     drawShape: function(sampleSeq, shapeKind) {
-        sampleSeq.forEach(function(sample, i, samples) {
+        sampleSeq.body.read_sample_seq.forEach(
+                function(sample, i, samples) {
             // Process metadata
             var validData = sample.read_sample_info.valid_data;
             var instanceHandle = sample.read_sample_info.instance_handle;
@@ -133,7 +127,7 @@ rti.shapesdemo = {
             }
 
             // Process sample data (i.e., color, shapesSize, and position
-            // of the received shape). If the colors is not in the list of
+            // of the received shape). If the color is not in the list of
             // supported colors, we assign it blue.
             var color;
             if (rti.shapesdemo.shapeColors.hasOwnProperty(sample.data.color)) {
@@ -146,7 +140,7 @@ rti.shapesdemo = {
             var x = sample.data.x - shapeSize/2;
             var y = sample.data.y - shapeSize/2;
 
-            // Look for the shape received in the canvas
+            // Look for the shape received on the canvas
             var shape = undefined;
             for (var i = 0; i < rti.shapesdemo.canvas.getObjects().length; i++){
                 var currentElement = rti.shapesdemo.canvas.getObjects()[i];
@@ -213,6 +207,69 @@ rti.shapesdemo = {
             }
             return true;
         });
+    },
+
+    /**
+     * This function creates a WebSocket instance and binds to
+     * a Web Integration Service.
+     * @param url the path of the entity to be bound
+     * @param figure_name The name of the figure that the example draws
+     */
+    createWebSocket: function(url, figure_name) {
+        const ws_protocol = 'ws://';
+        const ws_path = '/dds/websocket/MyWebSocketConnection';
+        const hostname = window.location.host;
+
+        var websocket = new WebSocket( ws_protocol + hostname + ws_path );
+
+        websocket.onmessage = function (raw_samples) {;
+            try {
+                if(raw_samples.data.includes("HELLO")){
+                    console.log(raw_samples.data);
+                } else{
+                    console.log(raw_samples.data);
+                    var samples = JSON.parse(raw_samples.data);
+                    rti.shapesdemo.drawShape(samples, figure_name);
+                }
+            } catch (error) {
+                console.log("Error: " + error.message);
+            }
+
+        }
+
+        websocket.onerror = function () {
+            alert("Error: webSocket is not enabled");
+            websocket.close();
+        }
+
+        websocket.onopen = function () {
+            //Send a hello Message" to make the handshake with the server.
+            var hello_msg =
+                "Content-Type:application/dds-web+json\r\n" +
+                "Accept:application/dds-web+json\r\n" +
+                "OMG-DDS-API-Key:<your-api-key>\r\n"+
+                "Version:1\r\n\r";
+            websocket.send(hello_msg);
+
+            // Send a bind message with the URI of the DataReader
+            // you want to use to subscribe to shapes.
+
+            var bind_msg =
+                {
+                    "kind": "bind",
+                    "body": [
+                        {
+                            "bind_kind":"bind_datareader",
+                            "bind_id": figure_name,
+                            "uri": url
+                        }
+                    ]
+                };
+
+             websocket.send(JSON.stringify(bind_msg));
+        }
+
+        return websocket;
     }
 }
 
